@@ -64,24 +64,16 @@ export function TeamProvider({ children }) {
 
   async function createTeam(name) {
     try {
-      const { data: newTeam, error: teamError } = await supabase
-        .from('teams')
-        .insert([{ name }])
-        .select()
-        .single();
+      // Invoca a function RPC (PostgreSQL Function) que criamos para evitar bloqueio de RLS
+      // ao tentar inserir um time e ainda não ter permissão de leitura sobre ele.
+      const { data: newTeamId, error: rpcError } = await supabase.rpc('create_team', { team_name: name });
 
-      if (teamError) throw teamError;
-
-      const { error: memberError } = await supabase
-        .from('team_members')
-        .insert([{ team_id: newTeam.id, user_id: user.id, role: 'owner' }]);
-
-      if (memberError) throw memberError;
+      if (rpcError) throw rpcError;
 
       toast.success('Time criado com sucesso!');
       await fetchTeams();
-      setActiveTeam(newTeam.id);
-      return newTeam;
+      setActiveTeam(newTeamId);
+      return newTeamId;
     } catch (err) {
       toast.error('Erro ao criar time: ' + err.message);
       throw err;

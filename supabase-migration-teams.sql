@@ -152,3 +152,25 @@ BEGIN
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ============================================
+-- 6. RPC: Função para o Frontend criar a tabela de times
+-- ============================================
+-- Necessário pois RLS bloqueia o SELECT imediato ao inserir um novo time
+CREATE OR REPLACE FUNCTION public.create_team(team_name TEXT) 
+RETURNS UUID AS $$
+DECLARE
+  new_team_id UUID;
+BEGIN
+  -- 1. Insere o novo time e captura a ID (bypassa RLS porque SECURITY DEFINER)
+  INSERT INTO public.teams (name) VALUES (team_name) RETURNING id INTO new_team_id;
+  
+  -- 2. Vincula o usuário autenticado que está criando como 'owner'
+  INSERT INTO public.team_members (team_id, user_id, role) 
+  VALUES (new_team_id, auth.uid(), 'owner');
+
+  -- 3. Retorna a ID do time criada
+  RETURN new_team_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

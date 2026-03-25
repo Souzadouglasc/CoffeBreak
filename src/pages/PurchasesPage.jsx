@@ -36,7 +36,11 @@ export default function PurchasesPage() {
       // 2. Fetch purchases of this team
       let query = supabase
         .from('purchases')
-        .select('*, participants(user_id)')
+        .select(`
+          *,
+          buyer:users!purchases_user_id_fkey(name),
+          participants(user_id, users(name))
+        `)
         .eq('team_id', activeTeamId)
         .order('date', { ascending: false });
 
