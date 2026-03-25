@@ -9,6 +9,7 @@ export function TeamProvider({ children }) {
   const { user } = useAuth();
   const [teams, setTeams] = useState([]);
   const [activeTeamId, setActiveTeamId] = useState(null);
+  const [pendingRequests, setPendingRequests] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(true);
 
   useEffect(() => {
@@ -16,6 +17,7 @@ export function TeamProvider({ children }) {
       fetchTeams();
     } else {
       setTeams([]);
+      setPendingRequests([]);
       setActiveTeamId(null);
       setLoadingTeams(false);
     }
@@ -41,12 +43,24 @@ export function TeamProvider({ children }) {
       const userTeams = data.map((tm) => tm.teams);
       setTeams(userTeams);
 
+      // Fetch pending requests for this user
+      const { data: reqData, error: reqError } = await supabase
+        .from('team_requests')
+        .select('*, teams(name)')
+        .eq('status', 'pending');
+        
+      if (!reqError && reqData) {
+        setPendingRequests(reqData);
+      }
+
       // Restore active team from local storage or pick first one
       const storedTeamId = localStorage.getItem('coffeebreak_active_team');
       if (storedTeamId && userTeams.find(t => t.id === storedTeamId)) {
-        setActiveTeamId(storedTeamId);
+        setActiveTeam(storedTeamId); // use setActiveTeam instead of raw state to ensure consistency
       } else if (userTeams.length > 0) {
         setActiveTeam(userTeams[0].id);
+      } else {
+        setActiveTeamId(null);
       }
     } catch (err) {
       console.error('Error fetching teams:', err.message);
@@ -58,15 +72,18 @@ export function TeamProvider({ children }) {
 
   function setActiveTeam(teamId) {
     setActiveTeamId(teamId);
-    localStorage.setItem('coffeebreak_active_team', teamId);
-    // Reload data context could be triggered here or children components listen to activeTeamId
+    if (teamId) {
+      localStorage.setItem('coffeebreak_active_team', teamId);
+    } else {
+      localStorage.removeItem('coffeebreak_active_team');
+    }
   }
 
-  async function createTeam(name) {
+  async function createTeamSecure(name, description = '') {
     try {
-      // Invoca a function RPC (PostgreSQL Function) que criamos para evitar bloqueio de RLS
-      // ao tentar inserir um time e ainda não ter permissão de leitura sobre ele.
-      const { data: newTeamId, error: rpcError } = await supabase.rpc('create_team', { team_name: name });
+      const { data: newTeamId, error: rpcError } = await supabase.rpc('create_team_secure', { 
+        p_name: name, p_description: description
+      });
 
       if (rpcError) throw rpcError;
 
@@ -75,16 +92,45 @@ export function TeamProvider({ children }) {
       setActiveTeam(newTeamId);
       return newTeamId;
     } catch (err) {
-      toast.error('Erro ao criar time: ' + err.message);
+      toast.error(err.message);
+      throw err;
+    }
+  }
+
+  async function requestJoinTeam(teamId, reason) {
+    try {
+      const { error: rpcError } = await supabase.rpc('request_team_join', { 
+        p_team_id: teamId, 
+        p_reason: reason 
+      });
+
+      if (rpcError) throw rpcError;
+
+      toast.success('Solicitação enviada!');
+      await fetchTeams();
+    } catch (err) {
+      toast.error(err.message);
       throw err;
     }
   }
 
   // Helper object to provide active team details easily
   const activeTeam = teams.find(t => t.id === activeTeamId) || null;
+  const hasNoTeams = teams.length === 0;
 
   return (
-    <TeamContext.Provider value={{ teams, activeTeam, activeTeamId, setActiveTeam, createTeam, loadingTeams, refreshTeams: fetchTeams }}>
+    <TeamContext.Provider value={{ 
+        teams, 
+        activeTeam, 
+        activeTeamId, 
+        setActiveTeam, 
+        createTeamSecure, 
+        requestJoinTeam,
+        pendingRequests,
+        hasNoTeams,
+        loadingTeams, 
+        refreshTeams: fetchTeams 
+      }}>
       {!loadingTeams && children}
     </TeamContext.Provider>
   );

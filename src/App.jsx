@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
@@ -7,9 +7,10 @@ import PurchasesPage from './pages/PurchasesPage';
 import NewPurchasePage from './pages/NewPurchasePage';
 import LoginPage from './pages/LoginPage';
 import TeamSettingsPage from './pages/TeamSettingsPage';
+import TeamSelectionPage from './pages/TeamSelectionPage';
+import TeamRequestsPage from './pages/TeamRequestsPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-
-import { TeamProvider } from './contexts/TeamContext';
+import { TeamProvider, useTeam } from './contexts/TeamContext';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -22,6 +23,26 @@ const ProtectedRoute = ({ children }) => {
 
   // Inside ProtectedRoute we know the user is authenticated, so we wrap with TeamProvider
   return <TeamProvider>{children}</TeamProvider>;
+};
+
+// TeamGuard blocks access to the app if user has no teams (except the /join page)
+const TeamGuard = ({ children }) => {
+  const { hasNoTeams, loadingTeams } = useTeam();
+  const location = useLocation();
+
+  if (loadingTeams) {
+    return <div className="loading" style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}><div className="spinner"></div></div>;
+  }
+
+  if (hasNoTeams && location.pathname !== '/join') {
+    return <Navigate to="/join" replace />;
+  }
+
+  if (!hasNoTeams && location.pathname === '/join') {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
 };
 
 // Route that redirects away from login if already authenticated
@@ -65,15 +86,24 @@ function App() {
           <Route
             element={
               <ProtectedRoute>
-                <Layout />
+                <TeamGuard>
+                  <Outlet />
+                </TeamGuard>
               </ProtectedRoute>
             }
           >
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/users" element={<UsersPage />} />
-            <Route path="/purchases" element={<PurchasesPage />} />
-            <Route path="/purchases/new" element={<NewPurchasePage />} />
-            <Route path="/team-settings" element={<TeamSettingsPage />} />
+            {/* Without Layout Sidebar */}
+            <Route path="/join" element={<TeamSelectionPage />} />
+
+            {/* With Layout Sidebar */}
+            <Route element={<Layout />}>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/users" element={<UsersPage />} />
+              <Route path="/purchases" element={<PurchasesPage />} />
+              <Route path="/purchases/new" element={<NewPurchasePage />} />
+              <Route path="/team-settings" element={<TeamSettingsPage />} />
+              <Route path="/team-requests" element={<TeamRequestsPage />} />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>

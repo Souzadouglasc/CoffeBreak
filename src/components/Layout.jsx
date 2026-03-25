@@ -1,29 +1,23 @@
 import { NavLink, Outlet, Navigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  FiHome,
-  FiUsers,
-  FiShoppingCart,
-  FiPlusCircle,
-  FiMenu,
-  FiX,
-  FiLogOut,
-  FiSettings
-} from 'react-icons/fi';
+import { FiHome, FiUsers, FiShoppingCart, FiPlusSquare, FiSettings, FiMenu, FiX, FiLogOut, FiInbox } from 'react-icons/fi';
+import { useTeam } from '../contexts/TeamContext';
 import TeamSwitcher from './TeamSwitcher';
 
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: <FiHome /> },
-  { to: '/users', label: 'Participantes', icon: <FiUsers /> },
-  { to: '/purchases', label: 'Compras', icon: <FiShoppingCart /> },
-  { to: '/purchases/new', label: 'Nova Compra', icon: <FiPlusCircle /> },
-  { to: '/team-settings', label: 'Config. do Time', icon: <FiSettings /> },
+  { path: '/', label: 'Dashboard', icon: <FiHome /> },
+  { path: '/users', label: 'Participantes', icon: <FiUsers /> },
+  { path: '/purchases', icon: <FiShoppingCart />, label: 'Compras' },
+  { path: '/purchases/new', icon: <FiPlusSquare />, label: 'Nova Compra' },
+  { path: '/team-requests', icon: <FiInbox />, label: 'Solicitações' },
+  { path: '/team-settings', icon: <FiSettings />, label: 'Config. do Time' },
 ];
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const { team } = useTeam(); // Assuming useTeam provides team data
 
   const closeSidebar = () => setSidebarOpen(false);
 
