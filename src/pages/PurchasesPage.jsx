@@ -39,7 +39,7 @@ export default function PurchasesPage() {
         .select(`
           *,
           buyer:users!purchases_user_id_fkey(name),
-          participants(user_id, users(name))
+          participants(user_id, paid, users(name))
         `)
         .eq('team_id', activeTeamId)
         .order('date', { ascending: false });
@@ -68,9 +68,35 @@ export default function PurchasesPage() {
         .eq('id', purchase.id);
       if (error) throw error;
       toast.success('Compra removida');
-      fetchData();
+      loadData();
     } catch (err) {
       toast.error('Erro ao remover: ' + err.message);
+    }
+  }
+
+  async function handleTogglePaid(purchase, participantUserId, currentPaidStatus) {
+    try {
+      const { error } = await supabase
+        .from('participants')
+        .update({ paid: !currentPaidStatus })
+        .match({ purchase_id: purchase.id, user_id: participantUserId });
+        
+      if (error) throw error;
+      
+      // Atualiza o state local rápido para não precisar de full reload
+      setPurchases(prev => prev.map(p => {
+        if (p.id === purchase.id) {
+          const newParts = p.participants.map(part => 
+            part.user_id === participantUserId ? { ...part, paid: !currentPaidStatus } : part
+          );
+          return { ...p, participants: newParts };
+        }
+        return p;
+      }));
+      
+      toast.success(!currentPaidStatus ? 'Pagamento recebido marcado!' : 'Marcado como pendente novamente.');
+    } catch (err) {
+      toast.error('Erro ao atualizar pagamento: ' + err.message);
     }
   }
 
@@ -169,17 +195,29 @@ export default function PurchasesPage() {
 
               {/* Participants */}
               <div className="purchase-participants">
-                {(p.participants || []).map((part, idx) => (
-                  <span
-                    key={idx}
-                    className={`participant-badge ${
-                      part.user_id === p.user_id ? 'buyer' : ''
-                    }`}
-                  >
-                    {part.user_id === p.user_id && '👑 '}
-                    {part.users?.name || 'Desconhecido'}
-                  </span>
-                ))}
+                {(p.participants || []).map((part, idx) => {
+                  const isBuyerSelf = part.user_id === p.user_id;
+                  const canToggle = currentUser?.id === p.user_id && !isBuyerSelf; 
+                  
+                  return (
+                    <span
+                      key={idx}
+                      onClick={() => canToggle ? handleTogglePaid(p, part.user_id, part.paid) : null}
+                      className={`participant-badge ${isBuyerSelf ? 'buyer' : ''} ${part.paid ? 'paid' : ''}`}
+                      style={{ 
+                        cursor: canToggle ? 'pointer' : 'default',
+                        opacity: part.paid ? 0.7 : 1,
+                        textDecoration: part.paid ? 'line-through' : 'none',
+                        border: part.paid ? '1px solid var(--color-success)' : undefined
+                      }}
+                      title={canToggle ? 'Clique para marcar como pago/pendente' : ''}
+                    >
+                      {isBuyerSelf && '👑 '}
+                      {!isBuyerSelf && part.paid && '✅ '}
+                      {part.users?.name || 'Desconhecido'}
+                    </span>
+                  );
+                })}
               </div>
 
               {/* Per person */}

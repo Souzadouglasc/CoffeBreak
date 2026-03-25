@@ -20,19 +20,21 @@ export function calculateBalances(purchases, users) {
   purchases.forEach((purchase) => {
     const buyerId = purchase.user_id;
     const amount = parseFloat(purchase.amount);
-    const participantIds = purchase.participants
-      ? purchase.participants.map((p) => p.user_id)
-      : [];
+    const participants = purchase.participants || [];
 
     // Se não há participantes, nada a dividir
-    if (participantIds.length === 0) return;
+    if (participants.length === 0) return;
 
-    // Valor por pessoa (divisão igualitária)
-    const share = amount / participantIds.length;
+    // Valor por pessoa (divisão igualitária baseado no total de participantes)
+    const share = amount / participants.length;
 
-    participantIds.forEach((participantId) => {
+    participants.forEach((p) => {
+      const participantId = p.user_id;
       // O comprador não deve para si mesmo
       if (participantId === buyerId) return;
+      
+      // Se a pessoa já pagou essa compra, a dívida dela por esta compra não existe mais
+      if (p.paid) return;
 
       // participantId deve 'share' para buyerId
       if (!balances[participantId]) balances[participantId] = {};

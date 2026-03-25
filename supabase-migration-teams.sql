@@ -50,6 +50,11 @@ BEGIN
     -- Tornar a coluna obrigatória após preencher os dados antigos
     ALTER TABLE public.purchases ALTER COLUMN team_id SET NOT NULL;
   END IF;
+
+  -- 4. Adicionar coluna 'paid' para rastrear quem já pagou o racha
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'participants' AND column_name = 'paid') THEN
+    ALTER TABLE public.participants ADD COLUMN paid BOOLEAN DEFAULT false;
+  END IF;
 END $$;
 
 -- ============================================
@@ -98,6 +103,10 @@ CREATE POLICY "Ver membros do time" ON public.team_members FOR SELECT TO authent
   team_id IN (SELECT public.get_auth_user_teams())
 );
 CREATE POLICY "O próprio banco gerencia inserts" ON public.team_members FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Donos podem remover membros" ON public.team_members FOR DELETE TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.team_members WHERE team_id = team_members.team_id AND user_id = auth.uid() AND role = 'owner')
+  OR user_id = auth.uid() -- O próprio usuário pode sair do time
+);
 
 -- Políticas Users: Você pode ver os perfis dos usuários que estão nos mesmos times que você
 CREATE POLICY "Ver usuarios do time" ON public.users FOR SELECT TO authenticated USING (
@@ -124,6 +133,9 @@ CREATE POLICY "Inserir participantes do time" ON public.participants FOR INSERT 
   purchase_id IN (SELECT id FROM public.purchases WHERE team_id IN (SELECT public.get_auth_user_teams()))
 );
 CREATE POLICY "Deletar participantes" ON public.participants FOR DELETE TO authenticated USING (
+  purchase_id IN (SELECT id FROM public.purchases WHERE user_id = auth.uid())
+);
+CREATE POLICY "Atualizar participantes" ON public.participants FOR UPDATE TO authenticated USING (
   purchase_id IN (SELECT id FROM public.purchases WHERE user_id = auth.uid())
 );
 

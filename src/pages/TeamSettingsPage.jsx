@@ -63,6 +63,23 @@ export default function TeamSettingsPage() {
     }
   }
 
+  async function handleRemoveMember(memberId, memberName) {
+    if (!window.confirm(`Tem certeza que deseja remover ${memberName} do time? As compras continuarão registradas.`)) return;
+    
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', memberId);
+        
+      if (error) throw error;
+      toast.success(`${memberName} foi removido do time.`);
+      fetchMembers();
+    } catch(err) {
+      toast.error('Erro ao remover: ' + err.message);
+    }
+  }
+
   if (!activeTeam) {
     return (
       <div className="empty-state">
@@ -118,7 +135,12 @@ export default function TeamSettingsPage() {
                   </div>
                 </div>
                 {member.role !== 'owner' && (
-                  <button className="btn btn-secondary" style={{ color: 'var(--color-danger)', border: 'none', background: 'transparent' }} onClick={() => toast('Em breve: Remover membro')}>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ color: 'var(--color-danger)', border: 'none', background: 'transparent' }} 
+                    onClick={() => handleRemoveMember(member.id, member.users?.name)}
+                    title="Remover membro"
+                  >
                     <FiTrash2 />
                   </button>
                 )}

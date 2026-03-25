@@ -43,7 +43,7 @@ export default function DashboardPage() {
       // Fetch purchases with participants FOR THIS TEAM
       const { data: purchasesData } = await supabase
         .from('purchases')
-        .select('*, participants(user_id)')
+        .select('*, participants(user_id, paid)')
         .eq('team_id', activeTeamId)
         .order('date', { ascending: false });
 
