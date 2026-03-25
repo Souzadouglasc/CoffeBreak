@@ -74,6 +74,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Remover políticas SaaS (Times) caso este script seja rodado mais de uma vez
+DROP POLICY IF EXISTS "Ver times" ON public.teams;
+DROP POLICY IF EXISTS "Qualquer logado pode criar time" ON public.teams;
+DROP POLICY IF EXISTS "Ver membros do time" ON public.team_members;
+DROP POLICY IF EXISTS "O próprio banco gerencia inserts" ON public.team_members;
+DROP POLICY IF EXISTS "Ver usuarios do time" ON public.users;
+DROP POLICY IF EXISTS "Acesso as compras do time" ON public.purchases;
+DROP POLICY IF EXISTS "Inserir compra no time" ON public.purchases;
+DROP POLICY IF EXISTS "Deletar própria compra" ON public.purchases;
+DROP POLICY IF EXISTS "Ver participantes do time" ON public.participants;
+DROP POLICY IF EXISTS "Inserir participantes do time" ON public.participants;
+DROP POLICY IF EXISTS "Deletar participantes" ON public.participants;
+
 -- Políticas Teams: O usuário vê apenas times onde ele é membro
 CREATE POLICY "Ver times" ON public.teams FOR SELECT TO authenticated USING (
   id IN (SELECT public.get_auth_user_teams())
