@@ -65,41 +65,50 @@ DROP POLICY IF EXISTS "Logados podem ver participantes" ON public.participants;
 DROP POLICY IF EXISTS "Logados inserem participantes" ON public.participants;
 DROP POLICY IF EXISTS "Criador da compra deleta participantes" ON public.participants;
 
+-- Função Helper (SECURITY DEFINER) para evitar erro 42P17 (Infinite Recursion)
+-- Essa função consulta team_members ignorando o RLS, evitando loop infinito.
+CREATE OR REPLACE FUNCTION public.get_auth_user_teams()
+RETURNS SETOF UUID AS $$
+BEGIN
+  RETURN QUERY SELECT team_id FROM public.team_members WHERE user_id = auth.uid();
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Políticas Teams: O usuário vê apenas times onde ele é membro
 CREATE POLICY "Ver times" ON public.teams FOR SELECT TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.team_members WHERE team_id = teams.id AND user_id = auth.uid())
+  id IN (SELECT public.get_auth_user_teams())
 );
 CREATE POLICY "Qualquer logado pode criar time" ON public.teams FOR INSERT TO authenticated WITH CHECK (true);
 
 -- Políticas Team Members: O usuário vê os membros dos times que ele participa
 CREATE POLICY "Ver membros do time" ON public.team_members FOR SELECT TO authenticated USING (
-  team_id IN (SELECT team_id FROM public.team_members WHERE user_id = auth.uid())
+  team_id IN (SELECT public.get_auth_user_teams())
 );
 CREATE POLICY "O próprio banco gerencia inserts" ON public.team_members FOR INSERT TO authenticated WITH CHECK (true);
 
 -- Políticas Users: Você pode ver os perfis dos usuários que estão nos mesmos times que você
 CREATE POLICY "Ver usuarios do time" ON public.users FOR SELECT TO authenticated USING (
-  id IN (SELECT user_id FROM public.team_members WHERE team_id IN (SELECT team_id FROM public.team_members WHERE user_id = auth.uid())) 
+  id IN (SELECT user_id FROM public.team_members WHERE team_id IN (SELECT public.get_auth_user_teams())) 
   OR id = auth.uid()
 );
 
 -- Políticas Purchases: Restrito apenas às compras do time do qual o usuário é membro
 CREATE POLICY "Acesso as compras do time" ON public.purchases FOR SELECT TO authenticated USING (
-  team_id IN (SELECT team_id FROM public.team_members WHERE user_id = auth.uid())
+  team_id IN (SELECT public.get_auth_user_teams())
 );
 CREATE POLICY "Inserir compra no time" ON public.purchases FOR INSERT TO authenticated WITH CHECK (
-  auth.uid() = user_id AND team_id IN (SELECT team_id FROM public.team_members WHERE user_id = auth.uid())
+  auth.uid() = user_id AND team_id IN (SELECT public.get_auth_user_teams())
 );
 CREATE POLICY "Deletar própria compra" ON public.purchases FOR DELETE TO authenticated USING (
-  auth.uid() = user_id AND team_id IN (SELECT team_id FROM public.team_members WHERE user_id = auth.uid())
+  auth.uid() = user_id AND team_id IN (SELECT public.get_auth_user_teams())
 );
 
 -- Políticas Participants: Mesma restrição da compra
 CREATE POLICY "Ver participantes do time" ON public.participants FOR SELECT TO authenticated USING (
-  purchase_id IN (SELECT id FROM public.purchases WHERE team_id IN (SELECT team_id FROM public.team_members WHERE user_id = auth.uid()))
+  purchase_id IN (SELECT id FROM public.purchases WHERE team_id IN (SELECT public.get_auth_user_teams()))
 );
 CREATE POLICY "Inserir participantes do time" ON public.participants FOR INSERT TO authenticated WITH CHECK (
-  purchase_id IN (SELECT id FROM public.purchases WHERE team_id IN (SELECT team_id FROM public.team_members WHERE user_id = auth.uid()))
+  purchase_id IN (SELECT id FROM public.purchases WHERE team_id IN (SELECT public.get_auth_user_teams()))
 );
 CREATE POLICY "Deletar participantes" ON public.participants FOR DELETE TO authenticated USING (
   purchase_id IN (SELECT id FROM public.purchases WHERE user_id = auth.uid())
