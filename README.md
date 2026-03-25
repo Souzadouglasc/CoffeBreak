@@ -1,4 +1,4 @@
-# ☕ CoffeeBrake – Racha do Café
+# ☕ CoffeBreak – Racha do Café
 
 Sistema web para gestão de compras compartilhadas entre colegas de trabalho.
 

@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { FiUsers, FiPlus, FiTrash2, FiDollarSign } from 'react-icons/fi';
+import { FiUsers, FiDollarSign } from 'react-icons/fi';
 import { supabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
-  const [name, setName] = useState('');
   const [loading, setLoading] = useState(true);
   const [totals, setTotals] = useState({});
 
@@ -41,40 +40,8 @@ export default function UsersPage() {
     }
   }
 
-  async function handleAddUser(e) {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) {
-      toast.error('Digite um nome');
-      return;
-    }
-
-    try {
-      const { error } = await supabase.from('users').insert({ name: trimmed });
-      if (error) throw error;
-      toast.success(`${trimmed} adicionado!`);
-      setName('');
-      fetchUsers();
-    } catch (err) {
-      toast.error('Erro ao adicionar: ' + err.message);
-    }
-  }
-
-  async function handleDeleteUser(user) {
-    if (!window.confirm(`Remover "${user.name}"? Isso removerá todas as compras associadas.`))
-      return;
-
-    try {
-      const { error } = await supabase.from('users').delete().eq('id', user.id);
-      if (error) throw error;
-      toast.success(`${user.name} removido`);
-      fetchUsers();
-    } catch (err) {
-      toast.error('Erro ao remover: ' + err.message);
-    }
-  }
-
   function getInitials(name) {
+    if (!name) return 'U';
     return name
       .split(' ')
       .map((w) => w[0])
@@ -87,30 +54,11 @@ export default function UsersPage() {
     <div>
       <div className="page-header">
         <h2>
-          <FiUsers /> Usuários
+          <FiUsers /> Participantes
         </h2>
-        <p>Gerencie os participantes do racha</p>
+        <p>Os usuários são adicionados automaticamente ao criar uma conta.</p>
       </div>
 
-      {/* Add user form */}
-      <div className="card" style={{ marginBottom: 'var(--spacing-xl)' }}>
-        <form onSubmit={handleAddUser} style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
-          <input
-            id="user-name-input"
-            type="text"
-            className="form-input"
-            placeholder="Nome do novo participante..."
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            style={{ flex: 1 }}
-          />
-          <button type="submit" className="btn btn-primary" id="add-user-btn">
-            <FiPlus /> Adicionar
-          </button>
-        </form>
-      </div>
-
-      {/* User list */}
       {loading ? (
         <div className="loading">
           <div className="spinner" /> Carregando...
@@ -119,9 +67,6 @@ export default function UsersPage() {
         <div className="empty-state">
           <div className="empty-icon">👥</div>
           <p>Nenhum usuário cadastrado ainda.</p>
-          <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
-            Adicione o primeiro participante acima!
-          </p>
         </div>
       ) : (
         <div className="user-list">
@@ -135,13 +80,6 @@ export default function UsersPage() {
                   Total gasto: R$ {(totals[user.id] || 0).toFixed(2)}
                 </div>
               </div>
-              <button
-                className="btn btn-ghost"
-                onClick={() => handleDeleteUser(user)}
-                title="Remover usuário"
-              >
-                <FiTrash2 size={16} color="var(--color-danger)" />
-              </button>
             </div>
           ))}
         </div>

@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiPlusCircle, FiCheck } from 'react-icons/fi';
+import { FiPlusCircle, FiCheck, FiUser } from 'react-icons/fi';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 export default function NewPurchasePage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   // Form fields
-  const [buyerId, setBuyerId] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -19,7 +21,7 @@ export default function NewPurchasePage() {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [user]);
 
   async function fetchUsers() {
     try {
@@ -28,7 +30,12 @@ export default function NewPurchasePage() {
         .select('*')
         .order('name');
       if (error) throw error;
+      
       setUsers(data || []);
+      // Automatically add current user to participants by default
+      if (user?.id) {
+        setSelectedParticipants([user.id]);
+      }
     } catch (err) {
       toast.error('Erro ao carregar usuários: ' + err.message);
     } finally {
@@ -55,8 +62,8 @@ export default function NewPurchasePage() {
   async function handleSubmit(e) {
     e.preventDefault();
 
-    if (!buyerId) {
-      toast.error('Selecione quem comprou');
+    if (!user?.id) {
+      toast.error('Erro de autenticação.');
       return;
     }
     if (!amount || parseFloat(amount) <= 0) {
@@ -74,11 +81,11 @@ export default function NewPurchasePage() {
 
     setSubmitting(true);
     try {
-      // 1. Insert purchase
+      // 1. Insert purchase (buyer is logged-in user)
       const { data: purchase, error: purchaseError } = await supabase
         .from('purchases')
         .insert({
-          user_id: buyerId,
+          user_id: user.id,
           amount: parseFloat(amount),
           description: description.trim(),
           date,
@@ -117,29 +124,6 @@ export default function NewPurchasePage() {
     );
   }
 
-  if (users.length === 0) {
-    return (
-      <div>
-        <div className="page-header">
-          <h2>
-            <FiPlusCircle /> Nova Compra
-          </h2>
-        </div>
-        <div className="empty-state">
-          <div className="empty-icon">👤</div>
-          <p>Cadastre ao menos um usuário antes de registrar compras.</p>
-          <button
-            className="btn btn-primary"
-            style={{ marginTop: 'var(--spacing-md)' }}
-            onClick={() => navigate('/users')}
-          >
-            Ir para Usuários
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div>
       <div className="page-header">
@@ -151,22 +135,24 @@ export default function NewPurchasePage() {
 
       <div className="card">
         <form onSubmit={handleSubmit}>
-          {/* Buyer */}
+          
+          {/* Buyer is fixed to logged in user */}
           <div className="form-group">
-            <label htmlFor="buyer-select">Quem comprou</label>
-            <select
-              id="buyer-select"
-              className="form-select"
-              value={buyerId}
-              onChange={(e) => setBuyerId(e.target.value)}
+            <label>Quem comprou</label>
+            <div 
+              style={{ 
+                padding: '0.75rem 1rem', 
+                background: 'var(--color-bg)', 
+                border: '1px solid var(--color-border)', 
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--color-text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
             >
-              <option value="">Selecione...</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
+              <FiUser /> {user?.user_metadata?.name || 'Você'} (Logado)
+            </div>
           </div>
 
           {/* Amount and Date */}
@@ -219,27 +205,34 @@ export default function NewPurchasePage() {
                   : 'Selecionar todos'}
               </button>
             </div>
-            <div className="checkbox-group">
-              {users.map((u) => {
-                const isChecked = selectedParticipants.includes(u.id);
-                return (
-                  <label
-                    key={u.id}
-                    className={`checkbox-item ${isChecked ? 'checked' : ''}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => toggleParticipant(u.id)}
-                    />
-                    <span className="checkbox-mark">
-                      {isChecked && <FiCheck size={12} />}
-                    </span>
-                    {u.name}
-                  </label>
-                );
-              })}
-            </div>
+            
+            {users.length === 0 ? (
+               <div style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                 Nenhum participante ainda além de você. Convide o pessoal para se cadastrar!
+               </div>
+            ) : (
+              <div className="checkbox-group">
+                {users.map((u) => {
+                  const isChecked = selectedParticipants.includes(u.id);
+                  return (
+                    <label
+                      key={u.id}
+                      className={`checkbox-item ${isChecked ? 'checked' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleParticipant(u.id)}
+                      />
+                      <span className="checkbox-mark">
+                        {isChecked && <FiCheck size={12} />}
+                      </span>
+                      {u.name}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Preview */}
