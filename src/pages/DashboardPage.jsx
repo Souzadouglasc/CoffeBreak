@@ -8,10 +8,12 @@ import {
   FiTrash2,
 } from 'react-icons/fi';
 import { supabase } from '../lib/supabaseClient';
+import { useTeam } from '../contexts/TeamContext';
 import { calculateBalances, calculateTotalPerUser } from '../utils/balanceCalculator';
 import toast from 'react-hot-toast';
 
 export default function DashboardPage() {
+  const { activeTeamId } = useTeam();
   const [users, setUsers] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [balances, setBalances] = useState([]);
@@ -20,25 +22,31 @@ export default function DashboardPage() {
   const [showClearModal, setShowClearModal] = useState(false);
 
   useEffect(() => {
-    fetchAll();
-  }, []);
+    if (activeTeamId) {
+      fetchAll();
+    } else {
+      setLoading(false);
+    }
+  }, [activeTeamId]);
 
   async function fetchAll() {
     setLoading(true);
     try {
-      // Fetch users
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('*')
-        .order('name');
+      // Fetch users ONLY in this team
+      const { data: membersData } = await supabase
+        .from('team_members')
+        .select('users(*)')
+        .eq('team_id', activeTeamId);
+        
+      const u = membersData ? membersData.map(tm => tm.users).filter(Boolean).sort((a,b) => a.name.localeCompare(b.name)) : [];
 
-      // Fetch purchases with participants
+      // Fetch purchases with participants FOR THIS TEAM
       const { data: purchasesData } = await supabase
         .from('purchases')
         .select('*, participants(user_id)')
+        .eq('team_id', activeTeamId)
         .order('date', { ascending: false });
 
-      const u = usersData || [];
       const p = purchasesData || [];
 
       setUsers(u);
@@ -54,20 +62,15 @@ export default function DashboardPage() {
 
   async function handleClearHistory() {
     try {
-      // Delete all participants first, then purchases
-      const { error: e1 } = await supabase
-        .from('participants')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (e1) throw e1;
-
-      const { error: e2 } = await supabase
+      // O ON DELETE CASCADE cuidará dos participants
+      const { error } = await supabase
         .from('purchases')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (e2) throw e2;
+        .eq('team_id', activeTeamId);
+        
+      if (error) throw error;
 
-      toast.success('Histórico limpo!');
+      toast.success('Histórico do time foi limpo!');
       setShowClearModal(false);
       fetchAll();
     } catch (err) {

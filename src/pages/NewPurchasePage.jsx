@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { FiPlusCircle, FiCheck, FiUser } from 'react-icons/fi';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import { useTeam } from '../contexts/TeamContext';
 import toast from 'react-hot-toast';
 
 export default function NewPurchasePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { activeTeamId } = useTeam();
   
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,24 +22,32 @@ export default function NewPurchasePage() {
   const [selectedParticipants, setSelectedParticipants] = useState([]);
 
   useEffect(() => {
-    fetchUsers();
-  }, [user]);
+    if (activeTeamId) {
+      fetchUsers();
+    } else {
+      setLoading(false);
+    }
+  }, [user, activeTeamId]);
 
   async function fetchUsers() {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('name');
+      const { data: membersData, error } = await supabase
+        .from('team_members')
+        .select('users(*)')
+        .eq('team_id', activeTeamId);
+        
       if (error) throw error;
       
-      setUsers(data || []);
+      const fetchedUsers = membersData ? membersData.map(tm => tm.users).filter(Boolean).sort((a,b) => a.name.localeCompare(b.name)) : [];
+      setUsers(fetchedUsers);
+
       // Automatically add current user to participants by default
       if (user?.id) {
         setSelectedParticipants([user.id]);
       }
     } catch (err) {
-      toast.error('Erro ao carregar usuários: ' + err.message);
+      toast.error('Erro ao carregar participantes: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -62,8 +72,8 @@ export default function NewPurchasePage() {
   async function handleSubmit(e) {
     e.preventDefault();
 
-    if (!user?.id) {
-      toast.error('Erro de autenticação.');
+    if (!user?.id || !activeTeamId) {
+      toast.error('Erro de autenticação ou time não selecionado.');
       return;
     }
     if (!amount || parseFloat(amount) <= 0) {
@@ -86,6 +96,7 @@ export default function NewPurchasePage() {
         .from('purchases')
         .insert({
           user_id: user.id,
+          team_id: activeTeamId,
           amount: parseFloat(amount),
           description: description.trim(),
           date,

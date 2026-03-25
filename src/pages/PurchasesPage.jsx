@@ -1,42 +1,54 @@
 import { useState, useEffect } from 'react';
-import { FiShoppingCart, FiTrash2, FiUser, FiCalendar, FiFilter } from 'react-icons/fi';
+import { FiShoppingCart, FiFilter, FiTrash2, FiCalendar } from 'react-icons/fi';
 import { supabase } from '../lib/supabaseClient';
+import { useTeam } from '../contexts/TeamContext';
+import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 export default function PurchasesPage() {
+  const { activeTeamId } = useTeam();
+  const { user: currentUser } = useAuth();
   const [purchases, setPurchases] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterUserId, setFilterUserId] = useState('');
+  const [selectedUserFilter, setSelectedUserFilter] = useState('');
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (activeTeamId) {
+      loadData();
+    } else {
+      setLoading(false);
+    }
+  }, [activeTeamId, selectedUserFilter]);
 
-  async function fetchData() {
+  async function loadData() {
     setLoading(true);
     try {
-      // Fetch users
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('*')
-        .order('name');
-      setUsers(usersData || []);
+      // 1. Fetch team members
+      const { data: membersData } = await supabase
+        .from('team_members')
+        .select('users(*)')
+        .eq('team_id', activeTeamId);
+      
+      const fetchedUsers = membersData ? membersData.map(tm => tm.users).filter(Boolean).sort((a,b) => a.name.localeCompare(b.name)) : [];
+      setUsers(fetchedUsers);
 
-      // Fetch purchases with participants
-      const { data: purchasesData, error } = await supabase
+      // 2. Fetch purchases of this team
+      let query = supabase
         .from('purchases')
-        .select(`
-          *,
-          buyer:users!purchases_user_id_fkey(name),
-          participants(user_id, users(name))
-        `)
+        .select('*, participants(user_id)')
+        .eq('team_id', activeTeamId)
         .order('date', { ascending: false });
 
+      if (selectedUserFilter) {
+        query = query.eq('user_id', selectedUserFilter);
+      }
+
+      const { data: purchasesData, error } = await query;
       if (error) throw error;
       setPurchases(purchasesData || []);
     } catch (err) {
-      toast.error('Erro ao carregar: ' + err.message);
+      toast.error('Erro ao carregar dados: ' + err.message);
     } finally {
       setLoading(false);
     }

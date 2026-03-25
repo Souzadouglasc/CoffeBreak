@@ -6,7 +6,10 @@ import UsersPage from './pages/UsersPage';
 import PurchasesPage from './pages/PurchasesPage';
 import NewPurchasePage from './pages/NewPurchasePage';
 import LoginPage from './pages/LoginPage';
+import TeamSettingsPage from './pages/TeamSettingsPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+
+import { TeamProvider } from './contexts/TeamContext';
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }) => {
@@ -17,7 +20,8 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  return children;
+  // Inside ProtectedRoute we know the user is authenticated, so we wrap with TeamProvider
+  return <TeamProvider>{children}</TeamProvider>;
 };
 
 // Route that redirects away from login if already authenticated
@@ -69,6 +73,7 @@ function App() {
             <Route path="/users" element={<UsersPage />} />
             <Route path="/purchases" element={<PurchasesPage />} />
             <Route path="/purchases/new" element={<NewPurchasePage />} />
+            <Route path="/team-settings" element={<TeamSettingsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

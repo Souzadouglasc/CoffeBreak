@@ -1,32 +1,41 @@
 import { useState, useEffect } from 'react';
 import { FiUsers, FiDollarSign } from 'react-icons/fi';
 import { supabase } from '../lib/supabaseClient';
+import { useTeam } from '../contexts/TeamContext';
 import toast from 'react-hot-toast';
 
 export default function UsersPage() {
+  const { activeTeamId } = useTeam();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totals, setTotals] = useState({});
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (activeTeamId) {
+      fetchUsers();
+    } else {
+      setLoading(false);
+    }
+  }, [activeTeamId]);
 
   async function fetchUsers() {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('name');
+      const { data: membersData, error } = await supabase
+        .from('team_members')
+        .select('users(*)')
+        .eq('team_id', activeTeamId);
 
       if (error) throw error;
-      setUsers(data || []);
+      
+      const fetchedUsers = membersData ? membersData.map(tm => tm.users).filter(Boolean).sort((a,b) => a.name.localeCompare(b.name)) : [];
+      setUsers(fetchedUsers);
 
-      // Fetch totals per user
+      // Fetch totals per user in this team
       const { data: purchases } = await supabase
         .from('purchases')
-        .select('user_id, amount');
+        .select('user_id, amount')
+        .eq('team_id', activeTeamId);
 
       const t = {};
       (purchases || []).forEach((p) => {
@@ -34,7 +43,7 @@ export default function UsersPage() {
       });
       setTotals(t);
     } catch (err) {
-      toast.error('Erro ao carregar usuários: ' + err.message);
+      toast.error('Erro ao carregar participantes: ' + err.message);
     } finally {
       setLoading(false);
     }

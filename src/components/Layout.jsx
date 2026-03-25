@@ -8,14 +8,17 @@ import {
   FiPlusCircle,
   FiMenu,
   FiX,
-  FiLogOut
+  FiLogOut,
+  FiSettings
 } from 'react-icons/fi';
+import TeamSwitcher from './TeamSwitcher';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: <FiHome /> },
-  { to: '/users', label: 'Usuários', icon: <FiUsers /> },
+  { to: '/users', label: 'Participantes', icon: <FiUsers /> },
   { to: '/purchases', label: 'Compras', icon: <FiShoppingCart /> },
   { to: '/purchases/new', label: 'Nova Compra', icon: <FiPlusCircle /> },
+  { to: '/team-settings', label: 'Config. do Time', icon: <FiSettings /> },
 ];
 
 export default function Layout() {
@@ -54,6 +57,10 @@ export default function Layout() {
               <div className="logo-subtitle">Racha do café</div>
             </div>
           </div>
+        </div>
+
+        <div style={{ padding: '0 var(--spacing-md)' }}>
+          <TeamSwitcher />
         </div>
 
         <nav className="sidebar-nav">

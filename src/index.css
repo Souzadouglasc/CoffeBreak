@@ -890,3 +890,11 @@ a:hover {
     grid-template-columns: 1fr;
   }
 }
+  
+/* --- Mobile First UI Optimizations --- */  
+@media (max-width: 768px) {  
+  .btn, .form-input, .sidebar-nav .nav-link { min-height: 48px; font-size: 1rem; }  
+  .stats-grid { grid-template-columns: 1fr; }  
+  .balance-item, .total-item { flex-direction: column; align-items: flex-start; gap: var(--spacing-sm); }  
+  .balance-item .balance-amount { align-self: flex-end; }  
+} 
