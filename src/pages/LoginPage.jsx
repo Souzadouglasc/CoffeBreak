@@ -33,8 +33,18 @@ export default function LoginPage() {
           return;
         }
 
-        const { error } = await signUp(email, password, name);
+        const { data, error } = await signUp(email, password, name);
         if (error) throw error;
+        
+        // Verifica se o Supabase exige confirmação de email (retorna user mas não retorna session)
+        if (data?.user && !data?.session) {
+          toast.success('Quase lá! Verifique sua caixa de e-mail e clique no link de confirmação.', { duration: 6000 });
+          setIsRegister(false); // Volta para a aba de login
+          setPassword(''); // Limpa a senha por segurança
+          setLoading(false);
+          return;
+        }
+
         toast.success('Conta criada! Bem-vindo.');
       } else {
         const { error } = await signIn(email, password);
@@ -42,16 +52,28 @@ export default function LoginPage() {
         toast.success('Login concluído!');
       }
 
-      // Supabase is quick, redirect usually handled by checking user state.
-      // But we can force it:
+      // Se passou direto, redireciona pro início
       navigate('/');
     } catch (err) {
-      toast.error(
-        isRegister
-          ? 'Erro ao criar conta: O e-mail já existe ou a senha é fraca (min 6 chars).'
-          : 'Credenciais inválidas.'
-      );
-      console.error(err);
+      let message = 'Ocorreu um erro inesperado.';
+      const errMsg = err.message || '';
+      
+      if (errMsg.includes('already registered')) {
+        message = 'Este e-mail já está cadastrado no sistema.';
+      } else if (errMsg.includes('Invalid login credentials')) {
+        message = 'E-mail não confirmado ou Senha incorreta.';
+      } else if (errMsg.includes('Email not confirmed')) {
+        message = 'Você precisa confirmar seu e-mail (clique no link que enviamos).';
+      } else if (errMsg.includes('Password should be')) {
+        message = 'A senha informada é muito fraca (mínimo 6 caracteres).';
+      } else if (errMsg.includes('rate limit')) {
+        message = 'Muitas tentativas. Aguarde um momento e tente novamente.';
+      } else {
+        message = errMsg;
+      }
+      
+      toast.error(message, { duration: 5000 });
+      console.error('Auth Error:', err);
     } finally {
       setLoading(false);
     }
